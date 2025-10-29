@@ -1,22 +1,44 @@
 import axios from "axios";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 function App() {
   const [mood, setMood] = useState("neutral");
   const [input, setInput] = useState("");
   const [theme, setTheme] = useState({
-    color: "#e0e0e0",
+    gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
     description: "Calm and balanced.",
   });
 
   const moodThemes = {
-    joy: { color: "#FFD700", description: "Bright and cheerful!" },
-    sadness: { color: "#87CEFA", description: "Calm and reflective." },
-    anger: { color: "#FF6347", description: "Intense and passionate." },
-    fear: { color: "#9370DB", description: "Cautious and alert." },
-    surprise: { color: "#FFA500", description: "Curious and amazed." },
-    love: { color: "#FF69B4", description: "Warm and affectionate." },
-    neutral: { color: "#B0C4DE", description: "Balanced and steady." },
+    joy: {
+      gradient: "linear-gradient(135deg, #f9d423 0%, #ff4e50 100%)",
+      description: "Bright and cheerful!",
+    },
+    sadness: {
+      gradient: "linear-gradient(135deg, #83a4d4 0%, #b6fbff 100%)",
+      description: "Calm and reflective.",
+    },
+    anger: {
+      gradient: "linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)",
+      description: "Intense and passionate.",
+    },
+    fear: {
+      gradient: "linear-gradient(135deg, #8360c3 0%, #2ebf91 100%)",
+      description: "Cautious and alert.",
+    },
+    surprise: {
+      gradient: "linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%)",
+      description: "Curious and amazed.",
+    },
+    love: {
+      gradient: "linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%)",
+      description: "Warm and affectionate.",
+    },
+    neutral: {
+      gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
+      description: "Balanced and steady.",
+    },
   };
 
   const detectMood = async () => {
@@ -31,14 +53,13 @@ function App() {
         { inputs: input },
         {
           headers: {
-            Authorization: 'Bearer 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' // Optional for free usage
+            Authorization: `Bearer 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`, // Replace this with your key
           },
         }
       );
 
       const emotion = response.data[0][0].label.toLowerCase();
       setMood(emotion);
-
       setTheme(moodThemes[emotion] || moodThemes["neutral"]);
     } catch (error) {
       console.error(error);
@@ -47,36 +68,62 @@ function App() {
   };
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 1.2 }}
       style={{
-        backgroundColor: theme.color,
-        height: "100vh",
+        background: theme.gradient,
+        minHeight: "100vh",
         display: "flex",
-        flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
-        transition: "background-color 0.5s ease",
+        transition: "background 1s ease",
+        fontFamily: "'Poppins', sans-serif",
       }}
     >
-      <h1 className="text-3xl font-bold">Feelify 🌈</h1>
-      <input
-        type="text"
-        placeholder="Type how you feel..."
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        className="p-2 m-3 rounded border text-center"
-      />
-      <button
-        onClick={detectMood}
-        className="bg-white text-black px-4 py-2 rounded shadow hover:bg-gray-200 transition"
+      <motion.div
+        initial={{ scale: 0.9 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="backdrop-blur-lg bg-white/20 rounded-2xl shadow-xl p-8 text-center w-96"
       >
-        Detect Mood
-      </button>
-      <div className="mt-4 text-center">
-        <h2 className="text-xl font-semibold">Mood: {mood}</h2>
-        <p>{theme.description}</p>
-      </div>
-    </div>
+        <h1 className="text-4xl font-extrabold mb-4 text-white drop-shadow-lg">
+          Feelify 🌈
+        </h1>
+        <p className="text-white/90 mb-6">
+          Discover your emotional vibe instantly!
+        </p>
+        <input
+          type="text"
+          placeholder="Type how you feel..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          className="w-full p-3 rounded-lg border-0 outline-none text-center text-lg mb-4"
+        />
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={detectMood}
+          className="bg-white/80 text-gray-800 font-semibold px-6 py-2 rounded-lg shadow-md hover:bg-white transition"
+        >
+          Detect Mood
+        </motion.button>
+
+        <motion.div
+          key={mood}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mt-6"
+        >
+          <h2 className="text-2xl font-bold text-white drop-shadow">
+            {mood.toUpperCase()}
+          </h2>
+          <p className="text-white/90 mt-2">{theme.description}</p>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }
 
