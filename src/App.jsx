@@ -68,7 +68,7 @@ function App() {
         { inputs: input },
         {
           headers: {
-            Authorization: `Bearer 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`, // Replace this with your real key
+            Authorization: `Bearer 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`, // Replace with your real key
           },
         }
       );
@@ -106,6 +106,19 @@ function App() {
     link.click();
   };
 
+  // 🗑 Remove a single theme
+  const removeTheme = (index) => {
+    const updated = savedThemes.filter((_, i) => i !== index);
+    setSavedThemes(updated);
+    localStorage.setItem("savedThemes", JSON.stringify(updated));
+  };
+
+  // 🧹 Clear all themes
+  const clearAllThemes = () => {
+    setSavedThemes([]);
+    localStorage.removeItem("savedThemes");
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -113,7 +126,7 @@ function App() {
       transition={{ duration: 1.2 }}
       style={{
         background: theme.gradient,
-        height: `${viewportHeight}px`, // ✅ full device height
+        height: viewportHeight + "px", // ✅ full device height
         width: "100vw",
         display: "flex",
         justifyContent: "center",
@@ -181,6 +194,45 @@ function App() {
             📤 Export
           </button>
         </div>
+
+        {/* 📜 Saved Themes Section */}
+        {savedThemes.length > 0 && (
+          <div className="mt-6 bg-white/10 rounded-xl p-4 max-h-56 overflow-y-auto backdrop-blur-md">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-lg font-semibold text-white">
+                Saved Themes 💾
+              </h3>
+              <button
+                onClick={clearAllThemes}
+                className="text-xs bg-white/30 hover:bg-white/50 text-gray-900 font-semibold px-2 py-1 rounded-md transition"
+              >
+                Clear All
+              </button>
+            </div>
+
+            <ul className="space-y-2">
+              {savedThemes.map((item, index) => (
+                <li
+                  key={index}
+                  className="flex justify-between items-start text-white/90 text-sm bg-white/20 rounded-lg p-2"
+                >
+                  <div className="text-left">
+                    <strong>{item.mood.toUpperCase()}</strong>
+                    <p className="text-xs text-white/80 mt-1">
+                      {item.description}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => removeTheme(index)}
+                    className="ml-3 text-xs bg-white/30 hover:bg-white/50 text-gray-900 font-semibold px-2 py-1 rounded-md transition"
+                  >
+                    ✖
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );
