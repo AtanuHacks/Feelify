@@ -68,7 +68,7 @@ function App() {
         { inputs: input },
         {
           headers: {
-            Authorization: `Bearer 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`, // Replace with your real key
+            Authorization: `Bearer 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`, // Replace this with your real key
           },
         }
       );
@@ -119,6 +119,12 @@ function App() {
     localStorage.removeItem("savedThemes");
   };
 
+  // 🎨 Apply saved theme on click
+  const applyTheme = (item) => {
+    setTheme({ gradient: item.gradient, description: item.description });
+    setMood(item.mood);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -126,7 +132,7 @@ function App() {
       transition={{ duration: 1.2 }}
       style={{
         background: theme.gradient,
-        height: viewportHeight + "px", // ✅ full device height
+        height: `${viewportHeight}px`,
         width: "100vw",
         display: "flex",
         justifyContent: "center",
@@ -214,7 +220,8 @@ function App() {
               {savedThemes.map((item, index) => (
                 <li
                   key={index}
-                  className="flex justify-between items-start text-white/90 text-sm bg-white/20 rounded-lg p-2"
+                  onClick={() => applyTheme(item)}
+                  className="flex justify-between items-start text-white/90 text-sm bg-white/20 rounded-lg p-2 cursor-pointer hover:bg-white/30 transition"
                 >
                   <div className="text-left">
                     <strong>{item.mood.toUpperCase()}</strong>
@@ -223,7 +230,10 @@ function App() {
                     </p>
                   </div>
                   <button
-                    onClick={() => removeTheme(index)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent theme apply when deleting
+                      removeTheme(index);
+                    }}
                     className="ml-3 text-xs bg-white/30 hover:bg-white/50 text-gray-900 font-semibold px-2 py-1 rounded-md transition"
                   >
                     ✖
