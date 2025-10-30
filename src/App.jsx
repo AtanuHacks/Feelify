@@ -1,26 +1,13 @@
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import useCameraMood from "./useCameraMood";
+
 
 function App() {
   const [mood, setMood] = useState("neutral");
   const [input, setInput] = useState("");
-  const [theme, setTheme] = useState({
-    gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
-    description: "Calm and balanced.",
-  });
-  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
-  const [savedThemes, setSavedThemes] = useState(() => {
-    const data = localStorage.getItem("savedThemes");
-    return data ? JSON.parse(data) : [];
-  });
-  const [showSaved, setShowSaved] = useState(false); // 👈 toggle state
-
-  useEffect(() => {
-    const handleResize = () => setViewportHeight(window.innerHeight);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  const { videoRef, cameraMood } = useCameraMood(); 
 
   const moodThemes = {
     joy: {
@@ -52,6 +39,43 @@ function App() {
       description: "Balanced and steady.",
     },
   };
+
+  const [theme, setTheme] = useState({
+    gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
+    description: "Calm and balanced.",
+  });
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [savedThemes, setSavedThemes] = useState(() => {
+    const data = localStorage.getItem("savedThemes");
+    return data ? JSON.parse(data) : [];
+  });
+  const [showSaved, setShowSaved] = useState(false); // 👈 toggle state
+
+  useEffect(() => {
+    const handleResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!cameraMood) return;
+
+    const moodMap = {
+      happy: "joy",
+      sad: "sadness",
+      angry: "anger",
+      fearful: "fear",
+      surprised: "surprise",
+      neutral: "neutral"
+    };
+
+    const mappedMood = moodMap[cameraMood] || "neutral";
+    setMood(mappedMood);
+    setTheme(moodThemes[mappedMood]);
+  }, [cameraMood]);
+
+
+
 
   const detectMood = async () => {
     if (!input.trim()) {
@@ -145,7 +169,7 @@ function App() {
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         transition={{ duration: 0.5 }}
-        className="backdrop-blur-lg bg-white/20 rounded-2xl shadow-xl p-8 text-center w-96 max-w-[90%]"
+        className="backdrop-blur-lg bg-white/20 rounded-2xl shadow-xl p-6 md:p-6 text-center w-[450px] md:w-[550px] max-w-[95%]"
       >
         <h1 className="text-4xl font-extrabold mb-4 text-white drop-shadow-lg">
           ✨ Feelify 🌈
@@ -159,6 +183,22 @@ function App() {
           onChange={(e) => setInput(e.target.value)}
           className="w-full p-3 rounded-lg border-2 border-gray-200 bg-transparent text-blue-600 placeholder-blue-600/70 outline-none text-center text-lg mb-4"
         />
+
+        <div className="w-full px-2">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          className="w-full h-58 rounded-lg border border-white/30 shadow-md object-cover"
+        ></video>
+
+
+          <p className="mt-2 text-white text-lg font-semibold">
+            Camera Mood: {cameraMood ? cameraMood.toUpperCase() : "Detecting..."}
+          </p>
+
+        </div>
+
 
         <motion.button
           whileHover={{ scale: 1.05 }}
