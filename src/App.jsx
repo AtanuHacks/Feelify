@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 function App() {
   const [mood, setMood] = useState("neutral");
@@ -9,20 +9,18 @@ function App() {
     gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
     description: "Calm and balanced.",
   });
-
-  // 🧭 Full-screen fix
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [savedThemes, setSavedThemes] = useState(() => {
+    const data = localStorage.getItem("savedThemes");
+    return data ? JSON.parse(data) : [];
+  });
+  const [showSaved, setShowSaved] = useState(false); // 👈 toggle state
+
   useEffect(() => {
     const handleResize = () => setViewportHeight(window.innerHeight);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // 💾 Manage saved themes
-  const [savedThemes, setSavedThemes] = useState(() => {
-    const data = localStorage.getItem("savedThemes");
-    return data ? JSON.parse(data) : [];
-  });
 
   const moodThemes = {
     joy: {
@@ -55,20 +53,18 @@ function App() {
     },
   };
 
-  // 🎭 Detect mood using Hugging Face API
   const detectMood = async () => {
     if (!input.trim()) {
       alert("Please enter some text!");
       return;
     }
-
     try {
       const response = await axios.post(
         "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base",
         { inputs: input },
         {
           headers: {
-            Authorization: `Bearer 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`, // Replace this with your real key
+            Authorization: `Bearer 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`,
           },
         }
       );
@@ -82,16 +78,22 @@ function App() {
     }
   };
 
-  // 💾 Save current theme
   const saveCurrentTheme = () => {
-    const newTheme = { mood, ...theme };
-    const updatedThemes = [...savedThemes, newTheme];
-    setSavedThemes(updatedThemes);
-    localStorage.setItem("savedThemes", JSON.stringify(updatedThemes));
-    alert(`Saved theme for ${mood.toUpperCase()}!`);
-  };
+    // Check if theme for this mood already exists
+    const alreadySaved = savedThemes.some((item) => item.mood === mood);
 
-  // 📤 Export themes as JSON
+    if (alreadySaved) {
+      alert(`Theme for ${mood.toUpperCase()} is already saved!`);
+      return;
+  }
+
+  const newTheme = { mood, ...theme };
+  const updatedThemes = [...savedThemes, newTheme];
+  setSavedThemes(updatedThemes);
+  localStorage.setItem("savedThemes", JSON.stringify(updatedThemes));
+  alert(`Saved theme for ${mood.toUpperCase()}!`);
+};
+
   const exportThemes = () => {
     if (savedThemes.length === 0) {
       alert("No saved themes to export!");
@@ -106,20 +108,17 @@ function App() {
     link.click();
   };
 
-  // 🗑 Remove a single theme
   const removeTheme = (index) => {
     const updated = savedThemes.filter((_, i) => i !== index);
     setSavedThemes(updated);
     localStorage.setItem("savedThemes", JSON.stringify(updated));
   };
 
-  // 🧹 Clear all themes
   const clearAllThemes = () => {
     setSavedThemes([]);
     localStorage.removeItem("savedThemes");
   };
 
-  // 🎨 Apply saved theme on click
   const applyTheme = (item) => {
     setTheme({ gradient: item.gradient, description: item.description });
     setMood(item.mood);
@@ -151,9 +150,7 @@ function App() {
         <h1 className="text-4xl font-extrabold mb-4 text-white drop-shadow-lg">
           ✨ Feelify 🌈
         </h1>
-        <p className="text-black mb-6">
-          Discover your emotional vibe instantly!
-        </p>
+        <p className="text-black mb-6">Discover your emotional vibe instantly!</p>
 
         <input
           type="text"
@@ -201,46 +198,66 @@ function App() {
           </button>
         </div>
 
-        {/* 📜 Saved Themes Section */}
+        {/* 🔽 Toggle Button */}
         {savedThemes.length > 0 && (
-          <div className="mt-6 bg-white/10 rounded-xl p-4 max-h-56 overflow-y-auto backdrop-blur-md">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold text-white">
-                Saved Themes 💾
-              </h3>
-              <button
-                onClick={clearAllThemes}
-                className="text-xs bg-white/30 hover:bg-white/50 text-gray-900 font-semibold px-2 py-1 rounded-md transition"
-              >
-                Clear All
-              </button>
-            </div>
+          <div className="mt-6">
+            <button
+              onClick={() => setShowSaved((prev) => !prev)}
+              className="text-white/90 underline text-sm hover:text-white transition"
+            >
+              {showSaved ? "Hide Saved Themes ▲" : "View Saved Themes ▼"}
+            </button>
 
-            <ul className="space-y-2">
-              {savedThemes.map((item, index) => (
-                <li
-                  key={index}
-                  onClick={() => applyTheme(item)}
-                  className="flex justify-between items-start text-white/90 text-sm bg-white/20 rounded-lg p-2 cursor-pointer hover:bg-white/30 transition"
+            {/* 📜 Collapsible Saved Section */}
+            <AnimatePresence>
+              {showSaved && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.4, ease: "easeInOut" }}
+                  className="bg-white/10 rounded-xl p-4 mt-3 overflow-hidden backdrop-blur-md"
                 >
-                  <div className="text-left">
-                    <strong>{item.mood.toUpperCase()}</strong>
-                    <p className="text-xs text-white/80 mt-1">
-                      {item.description}
-                    </p>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold text-white">
+                      Saved Themes 💾
+                    </h3>
+                    <button
+                      onClick={clearAllThemes}
+                      className="text-xs bg-white/30 hover:bg-white/50 text-gray-900 font-semibold px-2 py-1 rounded-md transition"
+                    >
+                      Clear All
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent theme apply when deleting
-                      removeTheme(index);
-                    }}
-                    className="ml-3 text-xs bg-white/30 hover:bg-white/50 text-gray-900 font-semibold px-2 py-1 rounded-md transition"
-                  >
-                    ✖
-                  </button>
-                </li>
-              ))}
-            </ul>
+
+                  <ul className="space-y-2 max-h-56 overflow-y-auto">
+                    {savedThemes.map((item, index) => (
+                      <li
+                        key={index}
+                        onClick={() => applyTheme(item)}
+                        className="flex justify-between items-start text-white/90 text-sm bg-white/20 rounded-lg p-2 cursor-pointer hover:bg-white/30 transition"
+                      >
+                        <div className="text-left">
+                          <strong>{item.mood.toUpperCase()}</strong>
+                          <p className="text-xs text-white/80 mt-1">
+                            {item.description}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeTheme(index);
+                          }}
+                          className="ml-3 text-xs bg-white/30 hover:bg-white/50 text-gray-900 font-semibold px-2 py-1 rounded-md transition"
+                        >
+                          ✖
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </motion.div>
