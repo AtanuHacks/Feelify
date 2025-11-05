@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import useCameraMood from "./useCameraMood";
 
 function App() {
-  const [mood, setMood] = useState("neutral");
+  const [mood, setMood] = useState("");
   const [input, setInput] = useState("");
   const { videoRef, cameraMood } = useCameraMood();
 
@@ -33,16 +33,18 @@ function App() {
       gradient: "linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%)",
       description: "Warm and affectionate.",
     },
-    neutral: {
-      gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
-      description: "Balanced and steady.",
-    },
+    // neutral: {
+    //   gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
+    //   description: "Balanced and steady.",
+    // },
   };
 
-  const [theme, setTheme] = useState({
-    gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
-    description: "Calm and balanced.",
-  });
+  const defaultTheme = {
+  gradient: "linear-gradient(135deg, #667eea, #764ba2)",
+  description: "Welcome to Feelify — Discover your emotional vibe 🌈",
+};
+
+  const [theme, setTheme] = useState(defaultTheme);
   const [viewportHeight, setViewportHeight] = useState(
     typeof window !== "undefined" ? window.innerHeight : 800
   );
@@ -137,21 +139,31 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!cameraMood) return;
+  if (!cameraMood) {
+    // When no camera mood detected yet, show default theme only once
+    setMood("");
+    setTheme(defaultTheme);
+    return;
+  }
 
-    const moodMap = {
-      happy: "joy",
-      sad: "sadness",
-      angry: "anger",
-      fearful: "fear",
-      surprised: "surprise",
-      neutral: "neutral",
-    };
+  const moodMap = {
+    happy: "joy",
+    sad: "sadness",
+    angry: "anger",
+    fearful: "fear",
+    surprised: "surprise",
+  };
 
-    const mappedMood = moodMap[cameraMood] || "neutral";
+  const mappedMood = moodMap[cameraMood.toLowerCase()];
+  if (mappedMood && moodThemes[mappedMood]) {
     setMood(mappedMood);
     setTheme(moodThemes[mappedMood]);
-  }, [cameraMood]);
+  } else {
+    // If mood is unknown, fallback to default theme (not neutral)
+    setMood("");
+    setTheme(defaultTheme);
+  }
+}, [cameraMood]);
 
   const detectMood = async () => {
   // ✅ If text is empty, do NOT detect through API, show message
@@ -176,8 +188,13 @@ function App() {
 
         console.log("Detected Text Emotion:", emotion);
 
-        setMood(emotion);
-        setTheme(moodThemes[emotion] || moodThemes["neutral"]);
+        if (moodThemes[emotion]) {
+          setTheme(moodThemes[emotion]);
+        } else {
+          alert("Unknown emotion detected. Try again!");
+          setTheme(defaultTheme);
+          setMood("");
+        }
 
       } catch (error) {
         console.error("❌ Error detecting mood:", error);
@@ -238,31 +255,36 @@ function App() {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 1.2 }}
-      style={{
-        background: theme.gradient,
-        height: `${viewportHeight}px`,
-        width: "100vw",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        overflow: "hidden",
-        transition: "background 1s ease",
-        fontFamily: "'Poppins', sans-serif",
-      }}
-    >
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ duration: 1.2 }}
+    style={{
+      background: theme ? theme.gradient : "linear-gradient(135deg, #667eea, #764ba2)", // fallback default
+      minHeight: `${viewportHeight - 80}px`, // leaves room for navbar height
+      width: "100vw",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      paddingTop: "70px", // gap below navbar
+      paddingBottom: "30px", // bottom space
+      paddingLeft: "20px",
+      paddingRight: "20px",
+      boxSizing: "border-box",
+      overflow: "hidden",
+      transition: "background 1s ease",
+      fontFamily: "'Poppins', sans-serif",
+    }}
+>
       <motion.div
-        initial={{ scale: 0.9 }}
+        initial={{ scale: 0.95 }}
         animate={{ scale: 1 }}
         transition={{ duration: 0.5 }}
-        className="backdrop-blur-lg bg-white/20 rounded-2xl shadow-xl p-6 md:p-6 text-center w-[450px] md:w-[550px] max-w-[95%]"
+        className="backdrop-blur-lg bg-white/20 rounded-2xl shadow-xl p-6 md:p-6 text-center w-[450px] md:w-[550px] max-w-[95%] mb-8 mx-4 "
       >
-        <h1 className="text-4xl font-extrabold mb-4 text-white drop-shadow-lg">
-          ✨ Feelify 🌈
-        </h1>
-        <p className="text-black mb-6">Discover your emotional vibe instantly!</p>
+      
+      <p className="text-3xl font-extrabold text-center text-black drop-shadow-[0_0_10px_rgba(255,255,255,0.7)] tracking-tight mb-8">
+        Let your emotions shape the colors of your world ✨
+      </p>
 
         {/* 🎤 Input + Mic Button */}
         <div className="relative w-full mb-4">
@@ -271,7 +293,7 @@ function App() {
             placeholder="Type how you feel..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="w-full p-3 pr-12 rounded-lg border-2 border-gray-200 bg-transparent text-blue-600 placeholder-blue-600/70 outline-none text-center text-lg"
+            className="w-full p-3 pr-12 rounded-lg border-2 border-gray-200 bg-transparent text-white-200 placeholder-white outline-none text-center text-lg"
           />
 
           {/* 🎤 Mic Button (same UI) */}
@@ -307,18 +329,26 @@ function App() {
           Detect Mood
         </motion.button>
 
-        <motion.div
-          key={mood}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mt-6"
-        >
+    <motion.div
+      key={mood || "default"}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="mt-6"
+    >
+      {mood ? (
+        <>
           <h2 className="text-2xl font-bold text-white drop-shadow">
             {mood.toUpperCase()}
           </h2>
           <p className="text-white/90 mt-2">{theme.description}</p>
-        </motion.div>
+        </>
+      ) : (
+        <p className="text-white/90 text-lg font-medium italic">
+          {theme.description}
+        </p>
+      )}
+    </motion.div>
 
         {/* 💾 Save & 📤 Export Buttons */}
         <div className="flex justify-center gap-3 mt-6">
