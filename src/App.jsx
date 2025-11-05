@@ -1,13 +1,12 @@
 import axios from "axios";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import useCameraMood from "./useCameraMood";
-
 
 function App() {
   const [mood, setMood] = useState("neutral");
   const [input, setInput] = useState("");
-  const { videoRef, cameraMood } = useCameraMood(); 
+  const { videoRef, cameraMood } = useCameraMood();
 
   const moodThemes = {
     joy: {
@@ -44,12 +43,92 @@ function App() {
     gradient: "linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)",
     description: "Calm and balanced.",
   });
-  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [viewportHeight, setViewportHeight] = useState(
+    typeof window !== "undefined" ? window.innerHeight : 800
+  );
   const [savedThemes, setSavedThemes] = useState(() => {
-    const data = localStorage.getItem("savedThemes");
-    return data ? JSON.parse(data) : [];
+    try {
+      const data = localStorage.getItem("savedThemes");
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
   });
-  const [showSaved, setShowSaved] = useState(false); // 👈 toggle state
+  const [showSaved, setShowSaved] = useState(false);
+
+  // --- Voice recognition related ---
+  const recognitionRef = useRef(null);
+  const [isListening, setIsListening] = useState(false);
+
+  // Move voice-start function into component scope so JSX can access it
+  const startVoiceInput = () => {
+    // pick standard or webkit prefixed
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice recognition not supported in this browser!");
+      return;
+    }
+
+    // If already created and listening, stop it (toggle)
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      console.log("🎙 Listening...");
+    };
+
+    recognition.onresult = (event) => {
+      try {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        console.log("🗣 You said:", transcript);
+      } catch (err) {
+        console.error("Parsing result error:", err);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("❌ Voice input error:", event.error);
+      // stop and set state
+      setIsListening(false);
+      recognition.stop();
+      alert("Could not recognize your voice. Try again.");
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      console.log("🎙 Stopped listening");
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  // cleanup recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onstart = null;
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.stop();
+        } catch {
+          /* ignore cleanup errors */
+        }
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setViewportHeight(window.innerHeight);
@@ -66,7 +145,7 @@ function App() {
       angry: "anger",
       fearful: "fear",
       surprised: "surprise",
-      neutral: "neutral"
+      neutral: "neutral",
     };
 
     const mappedMood = moodMap[cameraMood] || "neutral";
@@ -74,49 +153,54 @@ function App() {
     setTheme(moodThemes[mappedMood]);
   }, [cameraMood]);
 
-
-
-
   const detectMood = async () => {
-    if (!input.trim()) {
-      alert("Please enter some text!");
-      return;
-    }
-    try {
-      const response = await axios.post(
-        "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base",
-        { inputs: input },
-        {
-          headers: {
-            Authorization: `Bearer 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`,
-          },
-        }
-      );
+  // ✅ If text is empty, do NOT detect through API, show message
+      if (!input.trim()) {
+        alert("Please type how you feel or use the microphone 🎤.");
+        return;
+      }
 
-      const emotion = response.data[0][0].label.toLowerCase();
-      setMood(emotion);
-      setTheme(moodThemes[emotion] || moodThemes["neutral"]);
-    } catch (error) {
-      console.error(error);
-      alert("Error detecting mood. Try again later!");
-    }
-  };
+      try {
+        const response = await axios.post("http://localhost:5000/api/detect-mood", {
+          text: input,
+        });
+
+        const predictions = response.data[0];
+        
+        // ✅ Pick the highest score emotion
+        const bestEmotion = predictions.reduce((max, obj) =>
+          obj.score > max.score ? obj : max
+        );
+
+        const emotion = bestEmotion.label.toLowerCase();
+
+        console.log("Detected Text Emotion:", emotion);
+
+        setMood(emotion);
+        setTheme(moodThemes[emotion] || moodThemes["neutral"]);
+
+      } catch (error) {
+        console.error("❌ Error detecting mood:", error);
+        alert("Error detecting mood. Please try again.");
+      }
+    };
 
   const saveCurrentTheme = () => {
-    // Check if theme for this mood already exists
     const alreadySaved = savedThemes.some((item) => item.mood === mood);
-
     if (alreadySaved) {
       alert(`Theme for ${mood.toUpperCase()} is already saved!`);
       return;
-  }
-
-  const newTheme = { mood, ...theme };
-  const updatedThemes = [...savedThemes, newTheme];
-  setSavedThemes(updatedThemes);
-  localStorage.setItem("savedThemes", JSON.stringify(updatedThemes));
-  alert(`Saved theme for ${mood.toUpperCase()}!`);
-};
+    }
+    const newTheme = { mood, ...theme };
+    const updatedThemes = [...savedThemes, newTheme];
+    setSavedThemes(updatedThemes);
+    try {
+      localStorage.setItem("savedThemes", JSON.stringify(updatedThemes));
+    } catch {
+      /* ignore localStorage errors */
+    }
+    alert(`Saved theme for ${mood.toUpperCase()}!`);
+  };
 
   const exportThemes = () => {
     if (savedThemes.length === 0) {
@@ -135,12 +219,16 @@ function App() {
   const removeTheme = (index) => {
     const updated = savedThemes.filter((_, i) => i !== index);
     setSavedThemes(updated);
-    localStorage.setItem("savedThemes", JSON.stringify(updated));
+    try {
+      localStorage.setItem("savedThemes", JSON.stringify(updated));
+    } catch {}
   };
 
   const clearAllThemes = () => {
     setSavedThemes([]);
-    localStorage.removeItem("savedThemes");
+    try {
+      localStorage.removeItem("savedThemes");
+    } catch {}
   };
 
   const applyTheme = (item) => {
@@ -176,29 +264,39 @@ function App() {
         </h1>
         <p className="text-black mb-6">Discover your emotional vibe instantly!</p>
 
-        <input
-          type="text"
-          placeholder="Type how you feel..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          className="w-full p-3 rounded-lg border-2 border-gray-200 bg-transparent text-blue-600 placeholder-blue-600/70 outline-none text-center text-lg mb-4"
-        />
+        {/* 🎤 Input + Mic Button */}
+        <div className="relative w-full mb-4">
+          <input
+            type="text"
+            placeholder="Type how you feel..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className="w-full p-3 pr-12 rounded-lg border-2 border-gray-200 bg-transparent text-blue-600 placeholder-blue-600/70 outline-none text-center text-lg"
+          />
+
+          {/* 🎤 Mic Button (same UI) */}
+          {/* 🎤 Mic Button (Google-style) */}
+          <button
+            onClick={startVoiceInput}
+            className={`absolute right-3 top-1/2 -translate-y-1/2 mic-btn ${isListening ? "listening" : ""}`}
+            title="Speak your mood"
+          >
+            <i className={`fa-solid fa-microphone${isListening ? "-slash" : ""}`}></i>
+          </button>
+        </div>
 
         <div className="w-full px-2">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          className="w-full h-58 rounded-lg border border-white/30 shadow-md object-cover"
-        ></video>
-
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            className="w-full h-58 rounded-lg border border-white/30 shadow-md object-cover"
+          ></video>
 
           <p className="mt-2 text-white text-lg font-semibold">
             Camera Mood: {cameraMood ? cameraMood.toUpperCase() : "Detecting..."}
           </p>
-
         </div>
-
 
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -248,7 +346,6 @@ function App() {
               {showSaved ? "Hide Saved Themes ▲" : "View Saved Themes ▼"}
             </button>
 
-            {/* 📜 Collapsible Saved Section */}
             <AnimatePresence>
               {showSaved && (
                 <motion.div
