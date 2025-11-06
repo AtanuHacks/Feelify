@@ -1,18 +1,28 @@
-// src/components/Navbar.jsx
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Info, Mail, Palette, User } from "lucide-react";
+import { useCallback } from "react";
 
 function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogoClick = useCallback(() => {
+    // Always go to /app
+    navigate("/app");
+    // Dispatch a custom event to reset mood in App.jsx
+    window.dispatchEvent(new Event("resetMood"));
+  }, [navigate]);
 
   return (
     <nav className="fixed top-0 left-0 w-full bg-white/10 backdrop-blur-lg border-b border-white/20 z-50">
       <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center text-black">
         {/* Logo */}
-        <Link to="/" className="text-2xl font-bold tracking-wide flex items-center gap-2">
+        <button
+          onClick={handleLogoClick}
+          className="text-2xl font-bold tracking-wide flex items-center gap-2 hover:scale-105 hover:text-yellow-200 transition-all duration-300"
+        >
           ✨ <span>Feelify</span> 🌈
-        </Link>
+        </button>
 
         {/* Tabs with icons */}
         <div className="flex space-x-6 text-white/90 font-medium items-center">
@@ -31,7 +41,7 @@ function Navbar() {
               location.pathname === "/themes" ? "text-white font-semibold" : ""
             }`}
           >
-            <Palette className="w-4 h-4" /> View Themes
+            <Palette className="w-4 h-4" /> Favourite Themes
           </Link>
 
           <Link
@@ -53,7 +63,7 @@ function Navbar() {
           </Link>
         </div>
 
-        {/* Profile Icon with Text */}
+        {/* Profile Icon */}
         <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition">
           <User className="w-6 h-6" />
           <span>Profile</span>

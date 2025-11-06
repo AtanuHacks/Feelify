@@ -7,6 +7,7 @@ import About from "./About";
 import ContactUs from "./ContactUs";
 import Themes from "./Themes";
 
+
 function MainApp() {
   return (
     <Router>
@@ -20,6 +21,7 @@ function MainApp() {
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<ContactUs />} />
         <Route path="/themes" element={<Themes />} />
+        <Route path="/app" element={<App />} />
       </Routes>
     </Router>
   );

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import useCameraMood from "./useCameraMood";
 
 function App() {
@@ -14,6 +15,22 @@ function App() {
     stopCamera,
     detectCameraMoodOnce,
   } = useCameraMood();
+
+  useEffect(() => {
+  const resetHandler = () => {
+    setMood("");
+    setInput("");
+    setTheme({
+      gradient: "linear-gradient(135deg,#667eea,#764ba2)",
+      description: "Welcome to Feelify — Discover your emotional vibe 🌈",
+      button: { bg: "#fff", hover: "#e0e0e0", text: "#000" },
+    });
+  };
+
+  window.addEventListener("resetMood", resetHandler);
+  return () => window.removeEventListener("resetMood", resetHandler);
+}, []);
+
 
   const recognitionRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
