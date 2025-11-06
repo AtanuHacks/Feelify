@@ -31,7 +31,7 @@ function Navbar() {
               location.pathname === "/themes" ? "text-white font-semibold" : ""
             }`}
           >
-            <Palette className="w-4 h-4" /> Favourite Themes
+            <Palette className="w-4 h-4" /> View Themes
           </Link>
 
           <Link

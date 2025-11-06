@@ -5,6 +5,7 @@ import LandingPage from "./LandingPage";
 import App from "./App";
 import About from "./About";
 import ContactUs from "./ContactUs";
+import Themes from "./Themes";
 
 function MainApp() {
   return (
@@ -18,6 +19,7 @@ function MainApp() {
         <Route path="/app" element={<App />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<ContactUs />} />
+        <Route path="/themes" element={<Themes />} />
       </Routes>
     </Router>
   );

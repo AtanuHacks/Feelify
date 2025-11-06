@@ -26,6 +26,7 @@ function App() {
     surprise: { gradient: "linear-gradient(135deg,#ff9a9e,#fad0c4)", description: "Curious and amazed." },
     love: { gradient: "linear-gradient(135deg,#ff758c,#ff7eb3)", description: "Warm and affectionate." },
     neutral: { gradient: "linear-gradient(135deg,#89f7fe,#66a6ff)", description: "Balanced and steady." },
+    disgust: { gradient: "linear-gradient(135deg,#76b852,#8DC26F)", description: "Repulsed but aware — facing what feels unpleasant."} 
   };
 
   const moodEmojis = {
