@@ -20,7 +20,7 @@ function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 w-full bg-white/10 backdrop-blur-lg border-b border-white/20 z-50">
-      <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center text-black">
+      <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center text-white">
         {/* Logo */}
         <button
           onClick={handleLogoClick}
