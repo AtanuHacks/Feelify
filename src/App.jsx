@@ -3,8 +3,15 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import useCameraMood from "./useCameraMood";
+import { useAuth } from "./contexts/AuthContext";
+import LoginModal from "./components/LoginModal";
+import ProfilePanel from "./components/ProfilePanel";
 
 function App() {
+  const { user } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const isGuest = !!user?.isAnonymous;
   const [mood, setMood] = useState("");
   const [input, setInput] = useState("");
   const {
@@ -146,6 +153,7 @@ function App() {
 
   // 💬 Text mood detect
   const detectMood = async () => {
+    if (!user && !isGuest) return setShowLogin(true);
     if (!input.trim()) return alert("Type or speak your mood 🎤");
 
     try {
@@ -163,6 +171,7 @@ function App() {
 
   // 🎭 Camera mood detect
   const detectFromCamera = async () => {
+    if (!user && !isGuest) return setShowLogin(true);
     if (!cameraActive) return alert("Turn on camera first 📷");
     const detected = await detectCameraMoodOnce();
     if (detected) {
@@ -174,6 +183,7 @@ function App() {
 
   // 💾 Save / Export
   const saveCurrentTheme = () => {
+    if (!user && !isGuest) return setShowLogin(true);
     if (!mood) return alert("Detect mood first!");
     if (savedThemes.some((t) => t.mood === mood))
       return alert("Already saved!");
@@ -183,6 +193,7 @@ function App() {
   };
 
   const exportThemes = () => {
+    if (!user && !isGuest) return setShowLogin(true);
     if (!savedThemes.length) return alert("Nothing to export");
     const blob = new Blob([JSON.stringify(savedThemes, null, 2)], {
       type: "application/json",
@@ -194,6 +205,7 @@ function App() {
   };
 
   const applyTheme = (t) => {
+    if (!user && !isGuest) return setShowLogin(true);
     setTheme(t);
     setMood(t.mood);
   };
@@ -441,6 +453,9 @@ function App() {
           </>
         )}
       </motion.div>
+      {/* 🔐 Login and Profile Modals */}
+        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+        {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
     </motion.div>
   );
 }

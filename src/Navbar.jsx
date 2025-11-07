@@ -1,16 +1,21 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Info, Mail, Palette, User } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { useAuth } from "./contexts/AuthContext";
+import ProfilePanel from "./components/ProfilePanel";
+import LoginModal from "./components/LoginModal";
 
 function Navbar() {
+  const { user } = useAuth();
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+
   const location = useLocation();
   const navigate = useNavigate();
 
   const handleLogoClick = useCallback(() => {
-    // Always go to /app
-    navigate("/app");
-    // Dispatch a custom event to reset mood in App.jsx
-    window.dispatchEvent(new Event("resetMood"));
+    navigate("/"); // ✅ Always go to landing page
+    window.dispatchEvent(new Event("resetMood")); // still triggers your reset
   }, [navigate]);
 
   return (
@@ -41,7 +46,7 @@ function Navbar() {
               location.pathname === "/themes" ? "text-white font-semibold" : ""
             }`}
           >
-            <Palette className="w-4 h-4" /> Favourite Themes
+            <Palette className="w-4 h-4" /> View Themes
           </Link>
 
           <Link
@@ -63,11 +68,31 @@ function Navbar() {
           </Link>
         </div>
 
-        {/* Profile Icon */}
-        <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition">
-          <User className="w-6 h-6" />
-          <span>Profile</span>
-        </Link>
+        {/* 👤 Profile / Login */}
+        <button
+          onClick={() => {
+            if (user) setShowProfilePanel(true);
+            else setShowLogin(true);
+          }}
+          className="flex items-center gap-2 hover:opacity-80 transition text-white"
+        >
+          {user?.photoURL ? (
+            <img
+              src={user.photoURL}
+              alt="User"
+              className="w-8 h-8 rounded-full border border-white/40 shadow-sm"
+            />
+          ) : (
+            <User className="w-6 h-6" />
+          )}
+          <span>{user ? user.displayName?.split(" ")[0] || "Profile" : "Login"}</span>
+        </button>
+
+        {/* ✅ Firebase Login Modal */}
+        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+
+        {/* ✅ Profile Panel */}
+        {showProfilePanel && <ProfilePanel onClose={() => setShowProfilePanel(false)} />}
       </div>
     </nav>
   );
