@@ -253,9 +253,10 @@ function App() {
     if (!input.trim()) return alert("Type or speak your mood 🎤");
 
     try {
-      const res = await axios.post("http://localhost:5000/api/detect-mood", {
-        text: input,
-      });
+      const res = await axios.post(
+        "https://feelify-of1k.onrender.com/api/detect-mood",
+        { text: input }
+      );
       const best = res.data[0].reduce((a, b) => (a.score > b.score ? a : b));
       const normalized = normalizeEmotion(best.label.toLowerCase());
       setMood(normalized);

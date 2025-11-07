@@ -16,7 +16,7 @@ app.post("/api/detect-mood", async (req, res) => {
       { inputs: text },
       {
         headers: {
-          Authorization: `Bearer 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`, 
+          Authorization: `Bearer ${process.env.HF_KEY}`,
         },
       }
     );
