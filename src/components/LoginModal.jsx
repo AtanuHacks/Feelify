@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import ModalPortal from "./ModalPortal";
+import Logo from "../assets/logo.png";
 
 export default function LoginModal({ onClose }) {
   const {
@@ -56,7 +57,7 @@ export default function LoginModal({ onClose }) {
           {/* ✨ Header */}
           <h2 className="text-3xl font-extrabold mb-2 text-white flex items-center justify-center gap-2">
           <img
-            src="/public/logo.png"   // if stored in /public folder
+            src={Logo}   // if stored in /public folder
             alt="Feelify logo"
             className="w-9 h-9 object-contain align-middle"
           />

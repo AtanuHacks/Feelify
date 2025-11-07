@@ -8,19 +8,20 @@ import About from "./About";
 import ContactUs from "./ContactUs";
 import Themes from "./Themes";
 import { useAuth } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute"; // ✅ add this import
 
 // ✅ Subcomponent so we can use hooks inside Router
 function AppRoutes() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    // 🚀 Redirect automatically when user logs in (Google, Email, or Guest)
-    if (user && location.pathname === "/") {
+    // 🚀 Auto redirect when user logs in (Google, Email, or Guest)
+    if ((user || isGuest) && location.pathname === "/") {
       navigate("/app");
     }
-  }, [user, location, navigate]);
+  }, [user, isGuest, location, navigate]);
 
   return (
     <>
@@ -29,11 +30,42 @@ function AppRoutes() {
 
       {/* 📜 Page Routes */}
       <Routes>
+        {/* Public Route */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/app" element={<App />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<ContactUs />} />
-        <Route path="/themes" element={<Themes />} />
+
+        {/* Protected Routes */}
+        <Route
+          path="/app"
+          element={
+            <ProtectedRoute>
+              <App />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/themes"
+          element={
+            <ProtectedRoute>
+              <Themes />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/about"
+          element={
+            <ProtectedRoute>
+              <About />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/contact"
+          element={
+            <ProtectedRoute>
+              <ContactUs />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </>
   );

@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useAuth } from "./contexts/AuthContext";
 import ProfilePanel from "./components/ProfilePanel";
 import LoginModal from "./components/LoginModal";
+import Logo from "./assets/logo.png";
 
 function Navbar() {
   const { user } = useAuth();
@@ -27,7 +28,7 @@ function Navbar() {
           className="text-2xl font-bold tracking-wide flex items-center gap-0 hover:scale-105 hover:text-yellow-200 transition-all duration-300"
         >
           <img
-            src="/public/logo.png"   // make sure the path is correct
+            src={Logo}
             alt="Feelify logo"
             className="w-8 h-8 inline-block"
           />

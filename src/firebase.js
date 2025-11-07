@@ -8,6 +8,9 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { updateProfile } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+
+
 
 // 🔹 Your Firebase configuration (from console)
 const firebaseConfig = {
@@ -38,5 +41,5 @@ if (typeof window !== "undefined") {
       console.log("Analytics not supported in this environment.");
     });
 }
-
+export const db = getFirestore(app);
 export default app;

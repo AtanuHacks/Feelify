@@ -1,17 +1,32 @@
+// src/App.jsx
 import axios from "axios";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect } from "react";
 import useCameraMood from "./useCameraMood";
 import { useAuth } from "./contexts/AuthContext";
 import LoginModal from "./components/LoginModal";
 import ProfilePanel from "./components/ProfilePanel";
+
+// Firestore imports
+import { db } from "./firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+
+/**
+ * App.jsx
+ * - integrates Firestore save/load for savedThemes
+ * - preserves all UI and behavior you already had
+ *
+ * Note: this file assumes db exported from src/firebase.js via:
+ *   import { getFirestore } from "firebase/firestore";
+ *   export const db = getFirestore(app);
+ */
 
 function App() {
   const { user } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const isGuest = !!user?.isAnonymous;
+
   const [mood, setMood] = useState("");
   const [input, setInput] = useState("");
   const {
@@ -24,20 +39,19 @@ function App() {
   } = useCameraMood();
 
   useEffect(() => {
-  const resetHandler = () => {
-    setMood("");
-    setInput("");
-    setTheme({
-      gradient: "linear-gradient(135deg,#667eea,#764ba2)",
-      description: "Welcome to Feelify — Discover your emotional vibe 🌈",
-      button: { bg: "#fff", hover: "#e0e0e0", text: "#000" },
-    });
-  };
+    const resetHandler = () => {
+      setMood("");
+      setInput("");
+      setTheme({
+        gradient: "linear-gradient(135deg,#667eea,#764ba2)",
+        description: "Welcome to Feelify — Discover your emotional vibe 🌈",
+        button: { bg: "#fff", hover: "#e0e0e0", text: "#000" },
+      });
+    };
 
-  window.addEventListener("resetMood", resetHandler);
-  return () => window.removeEventListener("resetMood", resetHandler);
-}, []);
-
+    window.addEventListener("resetMood", resetHandler);
+    return () => window.removeEventListener("resetMood", resetHandler);
+  }, []);
 
   const recognitionRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
@@ -50,7 +64,7 @@ function App() {
       button: { bg: "#ffcc00", hover: "#ffb300", text: "#000" },
     },
     sadness: {
-      gradient: "linear-gradient(135deg,#bdc3c7,#2c3e50)", 
+      gradient: "linear-gradient(135deg,#bdc3c7,#2c3e50)",
       description: "Calm, introspective, and quietly emotional.",
       button: { bg: "#a9b0b8", hover: "#8f98a1", text: "#000" },
     },
@@ -104,6 +118,8 @@ function App() {
   };
 
   const [theme, setTheme] = useState(defaultTheme);
+
+  // savedThemes initialization uses localStorage (unchanged)
   const [savedThemes, setSavedThemes] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("savedThemes")) || [];
@@ -111,9 +127,85 @@ function App() {
       return [];
     }
   });
+
   const [showSaved, setShowSaved] = useState(false);
 
-  // Normalize
+  // -----------------------------
+  // Firestore helper functions
+  // -----------------------------
+
+  // Ensure user doc exists when a real user signs-in (or anonymous)
+  const ensureUserDocExists = async (uid) => {
+    if (!uid) return;
+    try {
+      const uDocRef = doc(db, "users", uid);
+      const snap = await getDoc(uDocRef);
+      if (!snap.exists()) {
+        // create initial document
+        await setDoc(uDocRef, {
+          savedThemes: [],
+          createdAt: new Date().toISOString(),
+          email: user?.email || null,
+          displayName: user?.displayName || null,
+        });
+      }
+    } catch (err) {
+      console.error("ensureUserDocExists error:", err);
+    }
+  };
+
+  // Load savedThemes from Firestore for logged-in users (non-guest or guest — we allow both)
+  const loadSavedThemesFromFirestore = async (uid) => {
+    if (!uid) return;
+    try {
+      const uDocRef = doc(db, "users", uid);
+      const snap = await getDoc(uDocRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.savedThemes)) {
+          // update both state and localStorage so UI and local cache reflect cloud
+          setSavedThemes(data.savedThemes);
+          localStorage.setItem("savedThemes", JSON.stringify(data.savedThemes));
+        }
+      }
+    } catch (err) {
+      console.error("loadSavedThemesFromFirestore error:", err);
+    }
+  };
+
+  // Write the full savedThemes array to Firestore (simple, reliable)
+  const writeSavedThemesToFirestore = async (uid, themesArray) => {
+    if (!uid) return;
+    try {
+      const uDocRef = doc(db, "users", uid);
+      // setDoc with merge false will replace the document, but we only set savedThemes field
+      await setDoc(uDocRef, { savedThemes: themesArray }, { merge: true });
+      console.log("Theme saved to cloud 🎨");
+    } catch (err) {
+      console.error("writeSavedThemesToFirestore error:", err);
+      alert("Could not save to cloud: " + err.message);
+    }
+  };
+
+  // When user logs in (or changes) — ensure doc and load cloud themes
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    (async () => {
+      try {
+        await ensureUserDocExists(user.uid);
+        // If there is cloud data for this user, load it into UI (overrides localStorage)
+        await loadSavedThemesFromFirestore(user.uid);
+      } catch (err) {
+        console.error("user effect error:", err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
+
+  // -----------------------------
+  // Utilities & normalization
+  // -----------------------------
   const normalizeEmotion = (emotion) => {
     const map = {
       happy: "joy",
@@ -132,7 +224,9 @@ function App() {
     return map[emotion] || emotion;
   };
 
-  // 🎤 Voice input
+  // -----------------------------
+  // Voice input
+  // -----------------------------
   const startVoiceInput = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -151,8 +245,11 @@ function App() {
     recognitionRef.current = r;
   };
 
-  // 💬 Text mood detect
+  // -----------------------------
+  // Mood detection (text)
+  // -----------------------------
   const detectMood = async () => {
+    // If user not logged and not guest, prompt login
     if (!user && !isGuest) return setShowLogin(true);
     if (!input.trim()) return alert("Type or speak your mood 🎤");
 
@@ -169,7 +266,9 @@ function App() {
     }
   };
 
-  // 🎭 Camera mood detect
+  // -----------------------------
+  // Camera mood detection
+  // -----------------------------
   const detectFromCamera = async () => {
     if (!user && !isGuest) return setShowLogin(true);
     if (!cameraActive) return alert("Turn on camera first 📷");
@@ -181,15 +280,22 @@ function App() {
     }
   };
 
-  // 💾 Save / Export
-  const saveCurrentTheme = () => {
+  // -----------------------------
+  // Save / Export logic (with Firestore integration)
+  // -----------------------------
+  const saveCurrentTheme = async () => {
     if (!user && !isGuest) return setShowLogin(true);
     if (!mood) return alert("Detect mood first!");
-    if (savedThemes.some((t) => t.mood === mood))
-      return alert("Already saved!");
+    if (savedThemes.some((t) => t.mood === mood)) return alert("Already saved!");
+
     const updated = [...savedThemes, { mood, ...theme }];
     setSavedThemes(updated);
     localStorage.setItem("savedThemes", JSON.stringify(updated));
+
+    // If user is logged-in (including anonymous) and has a uid, persist to Firestore
+    if (user?.uid) {
+      await writeSavedThemesToFirestore(user.uid, updated);
+    }
   };
 
   const exportThemes = () => {
@@ -209,21 +315,56 @@ function App() {
     setTheme(t);
     setMood(t.mood);
   };
-  const removeTheme = (i) => {
+
+  const removeTheme = async (i) => {
     const u = savedThemes.filter((_, x) => x !== i);
     setSavedThemes(u);
     localStorage.setItem("savedThemes", JSON.stringify(u));
-  };
-  const clearAllThemes = () => {
-    localStorage.removeItem("savedThemes");
-    setSavedThemes([]);
+    // update Firestore if logged in
+    if (user?.uid) {
+      await writeSavedThemesToFirestore(user.uid, u);
+    }
   };
 
+  const clearAllThemes = async () => {
+    localStorage.removeItem("savedThemes");
+    setSavedThemes([]);
+    if (user?.uid) {
+      await writeSavedThemesToFirestore(user.uid, []);
+    }
+  };
+
+  // -----------------------------
+  // Render (keeps your existing UI)
+  // -----------------------------
   return (
     <motion.div
       style={{ background: theme.gradient, minHeight: "100vh", paddingTop: "80px" }}
       className="flex flex-col items-center"
     >
+      {/* 👤 Profile icon top-right */}
+      <div className="absolute top-4 right-6">
+        <button
+          onClick={() => {
+            if (user) setShowProfile(true);
+            else setShowLogin(true);
+          }}
+          title={user ? "View Profile" : "Login"}
+        >
+          {user?.photoURL ? (
+            <img
+              src={user.photoURL}
+              alt="Profile"
+              className="w-10 h-10 rounded-full border-2 border-white shadow-md"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center text-xl">
+              🙂
+            </div>
+          )}
+        </button>
+      </div>
+
       {/* 🪞 Glass Card */}
       <motion.div
         className="backdrop-blur-lg bg-white/20 rounded-2xl shadow-xl p-6 w-[550px] max-w-[90%] text-center"
@@ -244,9 +385,7 @@ function App() {
               <h2 className="text-3xl font-extrabold text-white drop-shadow">
                 {moodEmojis[mood]} {mood.toUpperCase()}
               </h2>
-              <p className="text-white/90 mt-1 text-lg italic">
-                {theme.description}
-              </p>
+              <p className="text-white/90 mt-1 text-lg italic">{theme.description}</p>
             </>
           ) : (
             <>
@@ -272,9 +411,7 @@ function App() {
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             className={`absolute right-12 top-1/2 -translate-y-1/2 text-xl ${
-              isListening
-                ? "text-red-400 drop-shadow-[0_0_8px_#ff4d4d]"
-                : "text-white hover:text-red-300"
+              isListening ? "text-red-400 drop-shadow-[0_0_8px_#ff4d4d]" : "text-white hover:text-red-300"
             }`}
             title="Speak your mood"
           >
@@ -287,9 +424,7 @@ function App() {
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             className={`absolute right-3 top-1/2 -translate-y-1/2 text-xl ${
-              cameraActive
-                ? "text-green-400 drop-shadow-[0_0_8px_#00ff88]"
-                : "text-white hover:text-green-300"
+              cameraActive ? "text-green-400 drop-shadow-[0_0_8px_#00ff88]" : "text-white hover:text-green-300"
             }`}
             title={cameraActive ? "Stop camera" : "Start camera"}
           >
@@ -331,12 +466,8 @@ function App() {
               color: theme.button?.text || "#000",
               boxShadow: `0 0 12px ${theme.button?.hover || "#ffd369"}`,
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = theme.button?.hover || "#f5c243")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = theme.button?.bg || "#ffd369")
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.background = theme.button?.hover || "#f5c243")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = theme.button?.bg || "#ffd369")}
           >
             🎭 Detect from Camera
           </motion.button>
@@ -353,12 +484,8 @@ function App() {
             color: theme.button?.text || "#000",
             boxShadow: `0 0 12px ${theme.button?.hover || "#fff"}`,
           }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = theme.button?.bg || "#fff")
-          }
+          onMouseEnter={(e) => (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = theme.button?.bg || "#fff")}
         >
           💫 Detect Mood
         </motion.button>
@@ -375,12 +502,8 @@ function App() {
               color: theme.button?.text || "#000",
               boxShadow: `0 0 10px ${theme.button?.hover || "rgba(255,255,255,0.6)"}`,
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = theme.button?.bg || "rgba(255,255,255,0.7)")
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = theme.button?.bg || "rgba(255,255,255,0.7)")}
           >
             💾 Save Theme
           </motion.button>
@@ -395,12 +518,8 @@ function App() {
               color: theme.button?.text || "#000",
               boxShadow: `0 0 10px ${theme.button?.hover || "rgba(255,255,255,0.6)"}`,
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = theme.button?.bg || "rgba(255,255,255,0.7)")
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = theme.button?.bg || "rgba(255,255,255,0.7)")}
           >
             📤 Export
           </motion.button>
@@ -415,16 +534,8 @@ function App() {
 
             <AnimatePresence>
               {showSaved && (
-                <motion.div
-                  className="bg-white/10 rounded-xl p-3 mt-3"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <button
-                    className="text-xs bg-white/30 px-2 py-1 rounded mb-2"
-                    onClick={clearAllThemes}
-                  >
+                <motion.div className="bg-white/10 rounded-xl p-3 mt-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <button className="text-xs bg-white/30 px-2 py-1 rounded mb-2" onClick={clearAllThemes}>
                     Clear All
                   </button>
                   {savedThemes.map((t, i) => (
@@ -453,9 +564,10 @@ function App() {
           </>
         )}
       </motion.div>
+
       {/* 🔐 Login and Profile Modals */}
-        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
-        {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
     </motion.div>
   );
 }

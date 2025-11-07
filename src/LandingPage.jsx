@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Home, Info, Mail, Palette, User } from "lucide-react";
 import LoginModal from "./components/LoginModal";
+import Logo from "./assets/logo.png";
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ function LandingPage() {
       >
         <h1 className="text-6xl font-extrabold mb-6 drop-shadow-lg text-white flex items-center justify-center gap-1">
         <img
-          src="/public/logo.png"
+          src={Logo}
           alt="Feelify"
           className="w-20 h-20 inline-block"
         />
