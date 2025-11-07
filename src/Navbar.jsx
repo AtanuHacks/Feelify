@@ -24,9 +24,14 @@ function Navbar() {
         {/* Logo */}
         <button
           onClick={handleLogoClick}
-          className="text-2xl font-bold tracking-wide flex items-center gap-2 hover:scale-105 hover:text-yellow-200 transition-all duration-300"
+          className="text-2xl font-bold tracking-wide flex items-center gap-0 hover:scale-105 hover:text-yellow-200 transition-all duration-300"
         >
-          ✨ <span>Feelify</span> 🌈
+          <img
+            src="/public/logo.png"   // make sure the path is correct
+            alt="Feelify logo"
+            className="w-8 h-8 inline-block"
+          />
+          <span>Feelify</span>
         </button>
 
         {/* Tabs with icons */}

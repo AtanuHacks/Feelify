@@ -54,9 +54,16 @@ export default function LoginModal({ onClose }) {
           transition={{ duration: 0.35 }}
         >
           {/* ✨ Header */}
-          <h2 className="text-3xl font-extrabold mb-2 text-white">✨ Feelify</h2>
+          <h2 className="text-3xl font-extrabold mb-2 text-white flex items-center justify-center gap-2">
+          <img
+            src="/public/logo.png"   // if stored in /public folder
+            alt="Feelify logo"
+            className="w-9 h-9 object-contain align-middle"
+          />
+          <span className="align-middle">Feelify</span>
+          </h2>
           <h3 className="text-lg font-semibold mb-6 text-white/90">
-            {isSignup ? "Create a New Account 🌈" : "Login to Feel the Vibe 💫"}
+            {isSignup ? "Create a New Account 🌈" : "LogIn to Feel the Vibe 💫"}
           </h3>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">

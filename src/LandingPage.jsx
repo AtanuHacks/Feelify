@@ -25,9 +25,14 @@ function LandingPage() {
         transition={{ duration: 1 }}
         className="p-6 max-w-3xl mt-24"
       >
-        <h1 className="text-6xl font-extrabold mb-6 drop-shadow-lg">
-          ✨ Feelify 🌈
-        </h1>
+        <h1 className="text-6xl font-extrabold mb-6 drop-shadow-lg text-white flex items-center justify-center gap-1">
+        <img
+          src="/public/logo.png"
+          alt="Feelify"
+          className="w-20 h-20 inline-block"
+        />
+        Feelify
+      </h1>
 
         <p className="text-xl text-white/90 mb-8 leading-relaxed">
           Experience the power of emotion-driven design.  
