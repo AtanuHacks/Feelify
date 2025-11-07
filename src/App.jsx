@@ -206,22 +206,35 @@ function App() {
   // Utilities & normalization
   // -----------------------------
   const normalizeEmotion = (emotion) => {
-    const map = {
-      happy: "joy",
-      sad: "sadness",
-      sadness: "sadness",
-      angry: "anger",
-      anger: "anger",
-      fearful: "fear",
-      fear: "fear",
-      surprised: "surprise",
-      surprise: "surprise",
-      love: "love",
-      neutral: "neutral",
-      disgust: "disgust",
-    };
-    return map[emotion] || emotion;
+  const e = emotion.toLowerCase();
+  const map = {
+    happy: "joy",
+    joy: "joy",
+    sad: "sadness",
+    sadness: "sadness",
+    angry: "anger",
+    anger: "anger",
+    fearful: "fear",
+    fear: "fear",
+    surprised: "surprise",
+    surprise: "surprise",
+    disgust: "disgust",
+    neutral: "neutral",
+    love: "love",
+    affection: "love",
+    romantic: "love",
+    crush: "love",
+    heart: "love",
   };
+
+  // if the text contains love-related words, force 'love'
+  if (["love", "romantic", "affection", "heart", "crush"].some((w) => e.includes(w))) {
+    return "love";
+  }
+
+  return map[e] || e;
+};
+
 
   // -----------------------------
   // Voice input
@@ -247,24 +260,34 @@ function App() {
   // -----------------------------
   // Mood detection (text)
   // -----------------------------
-  const detectMood = async () => {
-    // If user not logged and not guest, prompt login
-    if (!user && !isGuest) return setShowLogin(true);
-    if (!input.trim()) return alert("Type or speak your mood 🎤");
+const detectMood = async () => {
+  if (!user && !isGuest) return setShowLogin(true);
+  if (!input.trim()) return alert("Type or speak your mood 🎤");
 
-    try {
-      const res = await axios.post(
-        "https://feelify-of1k.onrender.com/api/detect-mood",
-        { text: input }
-      );
-      const best = res.data[0].reduce((a, b) => (a.score > b.score ? a : b));
-      const normalized = normalizeEmotion(best.label.toLowerCase());
-      setMood(normalized);
-      setTheme(moodThemes[normalized] || defaultTheme);
-    } catch {
-      alert("Error detecting mood");
-    }
-  };
+  const lower = input.toLowerCase();
+
+  // ❤ Quick check for love words (instant detection)
+  const loveWords = ["love", "romantic", "affection", "heart", "crush"];
+  if (loveWords.some((word) => lower.includes(word))) {
+    setMood("love");
+    setTheme(moodThemes["love"]);
+    return;
+  }
+
+  try {
+    const res = await axios.post("https://feelify-of1k.onrender.com/api/detect-mood", {
+      text: input,
+    });
+    const best = res.data[0].reduce((a, b) => (a.score > b.score ? a : b));
+    const normalized = normalizeEmotion(best.label.toLowerCase());
+    setMood(normalized);
+    setTheme(moodThemes[normalized] || defaultTheme);
+  } catch (err) {
+    console.error("Mood detection error:", err);
+    alert("Error detecting mood");
+  }
+};
+
 
   // -----------------------------
   // Camera mood detection
