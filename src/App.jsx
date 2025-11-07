@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import useCameraMood from "./useCameraMood";
 import { useAuth } from "./contexts/AuthContext";
 import LoginModal from "./components/LoginModal";
-import ProfilePanel from "./components/ProfilePanel";
 
 // Firestore imports
 import { db } from "./firebase";
@@ -342,28 +341,6 @@ function App() {
       style={{ background: theme.gradient, minHeight: "100vh", paddingTop: "80px" }}
       className="flex flex-col items-center"
     >
-      {/* 👤 Profile icon top-right */}
-      <div className="absolute top-4 right-6">
-        <button
-          onClick={() => {
-            if (user) setShowProfile(true);
-            else setShowLogin(true);
-          }}
-          title={user ? "View Profile" : "Login"}
-        >
-          {user?.photoURL ? (
-            <img
-              src={user.photoURL}
-              alt="Profile"
-              className="w-10 h-10 rounded-full border-2 border-white shadow-md"
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center text-xl">
-              🙂
-            </div>
-          )}
-        </button>
-      </div>
 
       {/* 🪞 Glass Card */}
       <motion.div
