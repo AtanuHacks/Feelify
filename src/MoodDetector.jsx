@@ -6,7 +6,7 @@ const MoodDetector = () => {
   const [mood, setMood] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const API_KEY = "AIzaSyCODOrRg2QZ28epbX84EBECnUO9Zj26WoM"; // 🔑 Paste your Gemini API key here
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; // 🔑 Paste your Gemini API key here
   const genAI = new GoogleGenerativeAI(API_KEY);
 
   const detectMood = async () => {
