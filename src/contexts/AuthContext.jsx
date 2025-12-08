@@ -1,130 +1,64 @@
-// src/contexts/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
-import { auth } from "../firebase";
-import {
-  onAuthStateChanged,
-  signOut,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInAnonymously,
-  updateProfile,
-} from "firebase/auth";
+import { account } from "../appwrite"; // Imports your connection
+import { ID } from "appwrite";
 
 const AuthContext = createContext();
-export const useAuth = () => useContext(AuthContext);
 
-export function AuthProvider({ children }) {
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isGuest, setIsGuest] = useState(false);
 
-  // 🔁 Keep Firebase user in sync
+  // 1. Check if user is logged in on load
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        setIsGuest(firebaseUser.isAnonymous || false);
-      } else {
-        setUser(null);
-        setIsGuest(false);
-      }
-      setLoading(false);
-    });
-    return unsubscribe;
+    checkUserStatus();
   }, []);
 
-  // 🟩 Login Methods
-  const loginWithGoogle = async () => {
+  const checkUserStatus = async () => {
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      setIsGuest(false);
-    } catch (err) {
-      console.error("Google login failed:", err.code, err.message);
-      alert(`Google login failed: ${err.message}`);
-    }
-  };
-
-  const loginWithEmail = async (email, password) => {
-    try {
-      const res = await signInWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password.trim()
-      );
-      console.log("Email login successful:", res.user.email);
-      setIsGuest(false);
-    } catch (err) {
-      console.error("Email login failed:", err.code, err.message);
-      alert(`Authentication error: ${err.code.replace("auth/", "")}`);
-    }
-  };
-  const signupWithEmail = async (email, password, displayName) => {
-  try {
-    const res = await createUserWithEmailAndPassword(
-      auth,
-      email.trim(),
-      password.trim()
-    );
-
-    const user = res.user;
-    const nameToSet = displayName?.trim() || email.split("@")[0];
-
-    // ✅ Set name in Firebase
-    await updateProfile(user, { displayName: nameToSet });
-
-    // ✅ Update state immediately so Navbar/Profile show correct name
-    setUser({ ...user, displayName: nameToSet });
-    setIsGuest(false);
-    console.log("Signup successful with name:", nameToSet);
-  } catch (err) {
-    console.error("Signup failed:", err.code, err.message);
-    alert(`Signup error: ${err.code.replace("auth/", "")}`);
-  }
-};
-  // 🟦 Continue as Guest
-  const continueAsGuest = async () => {
-    try {
-      const userCredential = await signInAnonymously(auth);
-      setUser(userCredential.user);
-      setIsGuest(true);
-      console.log("Guest login successful:", userCredential.user.uid);
+      const accountDetails = await account.get();
+      setUser(accountDetails);
     } catch (error) {
-      console.error("Guest login failed:", error);
-      alert("Unable to continue as guest. Please try again.");
-    }
-  };
-
-  // 🟥 Logout
-  const logout = async () => {
-    try {
-      await signOut(auth);
       setUser(null);
-      setIsGuest(false);
-      console.log("User logged out successfully");
-    } catch (err) {
-      console.error("Logout failed:", err);
-      alert("Logout failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ✅ Provide to app
+  // 2. Login
+  const login = async (email, password) => {
+    await account.createEmailPasswordSession(email, password);
+    await checkUserStatus();
+  };
+
+  // 3. Signup
+  const signup = async (email, password, name) => {
+    // Create account
+    await account.create(ID.unique(), email, password, name);
+    // Auto-login after signup
+    await login(email, password);
+  };
+
+  // 4. Logout
+  const logout = async () => {
+    await account.deleteSession("current");
+    setUser(null);
+  };
+
+  const value = {
+    user,
+    login,
+    signup,
+    logout,
+    loading,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isGuest,
-        loading,
-        loginWithGoogle,
-        loginWithEmail,
-        signupWithEmail,
-        continueAsGuest,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {!loading && children}
     </AuthContext.Provider>
   );
-}
+};
+
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
