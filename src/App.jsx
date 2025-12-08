@@ -3,28 +3,22 @@ import axios from "axios";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import useCameraMood from "./useCameraMood";
-import { useAuth } from "./contexts/AuthContext";
+import { useAuth } from "./contexts/AuthContext"; // We use the real auth now!
 import LoginModal from "./components/LoginModal";
+import ProfilePanel from "./components/ProfilePanel";
 
-// Firestore imports
-import { db } from "./firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+// --- APPWRITE IMPORTS ---
+import { databases } from "./appwrite"; 
+import { ID } from "appwrite"; 
 
-/**
- * App.jsx
- * - integrates Firestore save/load for savedThemes
- * - preserves all UI and behavior you already had
- *
- * Note: this file assumes db exported from src/firebase.js via:
- *   import { getFirestore } from "firebase/firestore";
- *   export const db = getFirestore(app);
- */
+// --- 🔴 PASTE YOUR IDs HERE 🔴 ---
+const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID; // 'FeelifyDB'
+const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_ID; // 'UserPreferences'
 
 function App() {
-  const { user } = useAuth();
+  const { user } = useAuth(); // Get the logged-in user
   const [showLogin, setShowLogin] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const isGuest = !!user?.isAnonymous;
 
   const [mood, setMood] = useState("");
   const [input, setInput] = useState("");
@@ -37,17 +31,13 @@ function App() {
     detectCameraMoodOnce,
   } = useCameraMood();
 
+  // Reset handler
   useEffect(() => {
     const resetHandler = () => {
       setMood("");
       setInput("");
-      setTheme({
-        gradient: "linear-gradient(135deg,#667eea,#764ba2)",
-        description: "Welcome to Feelify — Discover your emotional vibe 🌈",
-        button: { bg: "#fff", hover: "#e0e0e0", text: "#000" },
-      });
+      setTheme(defaultTheme);
     };
-
     window.addEventListener("resetMood", resetHandler);
     return () => window.removeEventListener("resetMood", resetHandler);
   }, []);
@@ -55,7 +45,9 @@ function App() {
   const recognitionRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
 
-  // 🎨 Mood themes with button customization
+  // -----------------------------
+  // THEMES CONFIGURATION
+  // -----------------------------
   const moodThemes = {
     joy: {
       gradient: "linear-gradient(135deg,#f9d423,#ff4e50)",
@@ -100,14 +92,8 @@ function App() {
   };
 
   const moodEmojis = {
-    joy: "😄",
-    sadness: "😢",
-    anger: "😡",
-    fear: "😨",
-    surprise: "😲",
-    love: "❤",
-    neutral: "😐",
-    disgust: "🤢",
+    joy: "😄", sadness: "😢", anger: "😡", fear: "😨",
+    surprise: "😲", love: "❤", neutral: "😐", disgust: "🤢",
   };
 
   const defaultTheme = {
@@ -118,7 +104,7 @@ function App() {
 
   const [theme, setTheme] = useState(defaultTheme);
 
-  // savedThemes initialization uses localStorage (unchanged)
+  // Initialize savedThemes (try local storage first for speed)
   const [savedThemes, setSavedThemes] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("savedThemes")) || [];
@@ -126,129 +112,94 @@ function App() {
       return [];
     }
   });
-
   const [showSaved, setShowSaved] = useState(false);
 
   // -----------------------------
-  // Firestore helper functions
+  // APPWRITE DATABASE LOGIC ☁️
   // -----------------------------
 
-  // Ensure user doc exists when a real user signs-in (or anonymous)
-  const ensureUserDocExists = async (uid) => {
-    if (!uid) return;
-    try {
-      const uDocRef = doc(db, "users", uid);
-      const snap = await getDoc(uDocRef);
-      if (!snap.exists()) {
-        // create initial document
-        await setDoc(uDocRef, {
-          savedThemes: [],
-          createdAt: new Date().toISOString(),
-          email: user?.email || null,
-          displayName: user?.displayName || null,
-        });
-      }
-    } catch (err) {
-      console.error("ensureUserDocExists error:", err);
-    }
-  };
+  // 1. Load themes when user logs in
+  useEffect(() => {
+    if (!user?.$id) return; // If not logged in, do nothing
 
-  // Load savedThemes from Firestore for logged-in users (non-guest or guest — we allow both)
-  const loadSavedThemesFromFirestore = async (uid) => {
-    if (!uid) return;
-    try {
-      const uDocRef = doc(db, "users", uid);
-      const snap = await getDoc(uDocRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (Array.isArray(data.savedThemes)) {
-          // update both state and localStorage so UI and local cache reflect cloud
-          setSavedThemes(data.savedThemes);
-          localStorage.setItem("savedThemes", JSON.stringify(data.savedThemes));
+    const fetchCloudThemes = async () => {
+      try {
+        // We try to find a document that matches the User's ID
+        const doc = await databases.getDocument(
+          DATABASE_ID,
+          COLLECTION_ID,
+          user.$id 
+        );
+        if (doc.savedThemes) {
+          const cloudThemes = JSON.parse(doc.savedThemes);
+          setSavedThemes(cloudThemes);
+          localStorage.setItem("savedThemes", JSON.stringify(cloudThemes));
+        }
+      } catch (error) {
+        // 404 means "Document not found" -> User hasn't saved anything yet. That's fine.
+        if (error.code !== 404) {
+          console.error("Failed to load cloud themes:", error);
         }
       }
-    } catch (err) {
-      console.error("loadSavedThemesFromFirestore error:", err);
-    }
-  };
+    };
 
-  // Write the full savedThemes array to Firestore (simple, reliable)
-  const writeSavedThemesToFirestore = async (uid, themesArray) => {
-    if (!uid) return;
+    fetchCloudThemes();
+  }, [user]);
+
+  // 2. Save themes to Cloud
+  const saveToCloud = async (newThemes) => {
+    if (!user?.$id) return;
+
+    const themeString = JSON.stringify(newThemes);
+
     try {
-      const uDocRef = doc(db, "users", uid);
-      // setDoc with merge false will replace the document, but we only set savedThemes field
-      await setDoc(uDocRef, { savedThemes: themesArray }, { merge: true });
-      console.log("Theme saved to cloud 🎨");
-    } catch (err) {
-      console.error("writeSavedThemesToFirestore error:", err);
-      alert("Could not save to cloud: " + err.message);
+      // Try to UPDATE existing document
+      await databases.updateDocument(
+        DATABASE_ID,
+        COLLECTION_ID,
+        user.$id,
+        { savedThemes: themeString }
+      );
+      console.log("Synced to Appwrite Cloud ✅");
+    } catch (error) {
+      // If update fails (404), CREATE the document
+      if (error.code === 404) {
+        await databases.createDocument(
+          DATABASE_ID,
+          COLLECTION_ID,
+          user.$id, // We use User ID as Document ID so it's easy to find
+          { savedThemes: themeString }
+        );
+        console.log("Created new Cloud Save ✅");
+      } else {
+        console.error("Save failed:", error);
+      }
     }
   };
-
-  // When user logs in (or changes) — ensure doc and load cloud themes
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    (async () => {
-      try {
-        await ensureUserDocExists(user.uid);
-        // If there is cloud data for this user, load it into UI (overrides localStorage)
-        await loadSavedThemesFromFirestore(user.uid);
-      } catch (err) {
-        console.error("user effect error:", err);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
 
   // -----------------------------
-  // Utilities & normalization
+  // UTILITIES & HANDLERS
   // -----------------------------
   const normalizeEmotion = (emotion) => {
-  const e = emotion.toLowerCase();
-  const map = {
-    happy: "joy",
-    joy: "joy",
-    sad: "sadness",
-    sadness: "sadness",
-    angry: "anger",
-    anger: "anger",
-    fearful: "fear",
-    fear: "fear",
-    surprised: "surprise",
-    surprise: "surprise",
-    disgust: "disgust",
-    neutral: "neutral",
-    love: "love",
-    affection: "love",
-    romantic: "love",
-    crush: "love",
-    heart: "love",
+    const e = emotion.toLowerCase();
+    const map = {
+      happy: "joy", joy: "joy", sad: "sadness", sadness: "sadness",
+      angry: "anger", anger: "anger", fearful: "fear", fear: "fear",
+      surprised: "surprise", surprise: "surprise", disgust: "disgust",
+      neutral: "neutral", love: "love", affection: "love", romantic: "love",
+      crush: "love", heart: "love",
+    };
+    if (["love", "romantic", "affection", "heart", "crush"].some((w) => e.includes(w))) return "love";
+    return map[e] || e;
   };
 
-  // if the text contains love-related words, force 'love'
-  if (["love", "romantic", "affection", "heart", "crush"].some((w) => e.includes(w))) {
-    return "love";
-  }
-
-  return map[e] || e;
-};
-
-
-  // -----------------------------
-  // Voice input
-  // -----------------------------
   const startVoiceInput = () => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return alert("Voice not supported");
-
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop();
       return;
     }
-
     const r = new SpeechRecognition();
     r.onstart = () => setIsListening(true);
     r.onresult = (e) => setInput(e.results[0][0].transcript);
@@ -257,43 +208,41 @@ function App() {
     recognitionRef.current = r;
   };
 
-  // -----------------------------
-  // Mood detection (text)
-  // -----------------------------
-const detectMood = async () => {
-  if (!user && !isGuest) return setShowLogin(true);
-  if (!input.trim()) return alert("Type or speak your mood 🎤");
+  const detectMood = async () => {
+    // FORCE LOGIN: If no user, show login modal
+    if (!user) {
+        setShowLogin(true);
+        return;
+    }
+    
+    if (!input.trim()) return alert("Type or speak your mood 🎤");
+    const lower = input.toLowerCase();
+    const loveWords = ["love", "romantic", "affection", "heart", "crush"];
+    if (loveWords.some((word) => lower.includes(word))) {
+      setMood("love");
+      setTheme(moodThemes["love"]);
+      return;
+    }
 
-  const lower = input.toLowerCase();
+    try {
+      const res = await axios.post("https://feelify-of1k.onrender.com/api/detect-mood", { text: input });
+      const best = res.data[0].reduce((a, b) => (a.score > b.score ? a : b));
+      const normalized = normalizeEmotion(best.label.toLowerCase());
+      setMood(normalized);
+      setTheme(moodThemes[normalized] || defaultTheme);
+    } catch (err) {
+      console.error("Mood detection error:", err);
+      alert("Error detecting mood");
+    }
+  };
 
-  // ❤ Quick check for love words (instant detection)
-  const loveWords = ["love", "romantic", "affection", "heart", "crush"];
-  if (loveWords.some((word) => lower.includes(word))) {
-    setMood("love");
-    setTheme(moodThemes["love"]);
-    return;
-  }
-
-  try {
-    const res = await axios.post("https://feelify-of1k.onrender.com/api/detect-mood", {
-      text: input,
-    });
-    const best = res.data[0].reduce((a, b) => (a.score > b.score ? a : b));
-    const normalized = normalizeEmotion(best.label.toLowerCase());
-    setMood(normalized);
-    setTheme(moodThemes[normalized] || defaultTheme);
-  } catch (err) {
-    console.error("Mood detection error:", err);
-    alert("Error detecting mood");
-  }
-};
-
-
-  // -----------------------------
-  // Camera mood detection
-  // -----------------------------
   const detectFromCamera = async () => {
-    if (!user && !isGuest) return setShowLogin(true);
+    // FORCE LOGIN
+    if (!user) {
+        setShowLogin(true);
+        return;
+    }
+
     if (!cameraActive) return alert("Turn on camera first 📷");
     const detected = await detectCameraMoodOnce();
     if (detected) {
@@ -303,30 +252,37 @@ const detectMood = async () => {
     }
   };
 
-  // -----------------------------
-  // Save / Export logic (with Firestore integration)
-  // -----------------------------
   const saveCurrentTheme = async () => {
-    if (!user && !isGuest) return setShowLogin(true);
+    if (!user) return setShowLogin(true);
     if (!mood) return alert("Detect mood first!");
     if (savedThemes.some((t) => t.mood === mood)) return alert("Already saved!");
 
     const updated = [...savedThemes, { mood, ...theme }];
     setSavedThemes(updated);
     localStorage.setItem("savedThemes", JSON.stringify(updated));
+    
+    // 🔥 SYNC TO APPWRITE
+    await saveToCloud(updated);
+  };
 
-    // If user is logged-in (including anonymous) and has a uid, persist to Firestore
-    if (user?.uid) {
-      await writeSavedThemesToFirestore(user.uid, updated);
-    }
+  const removeTheme = async (i) => {
+    const u = savedThemes.filter((_, x) => x !== i);
+    setSavedThemes(u);
+    localStorage.setItem("savedThemes", JSON.stringify(u));
+    // 🔥 SYNC TO APPWRITE
+    await saveToCloud(u);
+  };
+
+  const clearAllThemes = async () => {
+    localStorage.removeItem("savedThemes");
+    setSavedThemes([]);
+    // 🔥 SYNC TO APPWRITE
+    await saveToCloud([]);
   };
 
   const exportThemes = () => {
-    if (!user && !isGuest) return setShowLogin(true);
     if (!savedThemes.length) return alert("Nothing to export");
-    const blob = new Blob([JSON.stringify(savedThemes, null, 2)], {
-      type: "application/json",
-    });
+    const blob = new Blob([JSON.stringify(savedThemes, null, 2)], { type: "application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = "saved_themes.json";
@@ -334,46 +290,25 @@ const detectMood = async () => {
   };
 
   const applyTheme = (t) => {
-    if (!user && !isGuest) return setShowLogin(true);
     setTheme(t);
     setMood(t.mood);
   };
 
-  const removeTheme = async (i) => {
-    const u = savedThemes.filter((_, x) => x !== i);
-    setSavedThemes(u);
-    localStorage.setItem("savedThemes", JSON.stringify(u));
-    // update Firestore if logged in
-    if (user?.uid) {
-      await writeSavedThemesToFirestore(user.uid, u);
-    }
-  };
-
-  const clearAllThemes = async () => {
-    localStorage.removeItem("savedThemes");
-    setSavedThemes([]);
-    if (user?.uid) {
-      await writeSavedThemesToFirestore(user.uid, []);
-    }
-  };
-
   // -----------------------------
-  // Render (keeps your existing UI)
+  // RENDER
   // -----------------------------
   return (
     <motion.div
       style={{ background: theme.gradient, minHeight: "100vh", paddingTop: "80px" }}
       className="flex flex-col items-center"
     >
-
-      {/* 🪞 Glass Card */}
       <motion.div
         className="backdrop-blur-lg bg-white/20 rounded-2xl shadow-xl p-6 w-[550px] max-w-[90%] text-center"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        {/* 🌟 Mood Display */}
+        {/* Mood Display */}
         <motion.div
           key={mood || "default"}
           initial={{ opacity: 0, y: -10 }}
@@ -397,7 +332,7 @@ const detectMood = async () => {
           )}
         </motion.div>
 
-        {/* 🌈 Input + Mic + Camera */}
+        {/* Input + Mic + Camera */}
         <div className="relative w-full mb-4">
           <input
             className="w-full p-3 pr-20 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-black placeholder-black/70 text-center focus:outline-none focus:ring-2 focus:ring-white/50 transition"
@@ -406,7 +341,7 @@ const detectMood = async () => {
             onChange={(e) => setInput(e.target.value)}
           />
 
-          {/* 🎤 Mic */}
+          {/* Mic */}
           <motion.button
             onClick={startVoiceInput}
             whileHover={{ scale: 1.2 }}
@@ -419,7 +354,7 @@ const detectMood = async () => {
             🎤
           </motion.button>
 
-          {/* 📷 Camera */}
+          {/* Camera */}
           <motion.button
             onClick={() => (cameraActive ? stopCamera() : startCamera())}
             whileHover={{ scale: 1.2 }}
@@ -433,7 +368,7 @@ const detectMood = async () => {
           </motion.button>
         </div>
 
-        {/* 🎥 Camera Preview */}
+        {/* Camera Preview */}
         <AnimatePresence>
           {cameraActive && (
             <motion.div
@@ -455,7 +390,7 @@ const detectMood = async () => {
           )}
         </AnimatePresence>
 
-        {/* 🎭 Detect from Camera */}
+        {/* Detect Buttons */}
         {cameraActive && (
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -467,14 +402,11 @@ const detectMood = async () => {
               color: theme.button?.text || "#000",
               boxShadow: `0 0 12px ${theme.button?.hover || "#ffd369"}`,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = theme.button?.hover || "#f5c243")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = theme.button?.bg || "#ffd369")}
           >
             🎭 Detect from Camera
           </motion.button>
         )}
 
-        {/* 💫 Detect Mood */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -485,13 +417,11 @@ const detectMood = async () => {
             color: theme.button?.text || "#000",
             boxShadow: `0 0 12px ${theme.button?.hover || "#fff"}`,
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = theme.button?.bg || "#fff")}
         >
           💫 Detect Mood
         </motion.button>
 
-        {/* 💾 Save & Export */}
+        {/* Save & Export */}
         <div className="flex gap-3 justify-center mt-5">
           <motion.button
             whileHover={{ scale: 1.08 }}
@@ -503,8 +433,6 @@ const detectMood = async () => {
               color: theme.button?.text || "#000",
               boxShadow: `0 0 10px ${theme.button?.hover || "rgba(255,255,255,0.6)"}`,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = theme.button?.bg || "rgba(255,255,255,0.7)")}
           >
             💾 Save Theme
           </motion.button>
@@ -519,20 +447,17 @@ const detectMood = async () => {
               color: theme.button?.text || "#000",
               boxShadow: `0 0 10px ${theme.button?.hover || "rgba(255,255,255,0.6)"}`,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = theme.button?.hover || "#e5e5e5")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = theme.button?.bg || "rgba(255,255,255,0.7)")}
           >
             📤 Export
           </motion.button>
         </div>
 
-        {/* 📂 Saved Themes */}
+        {/* Saved Themes List */}
         {savedThemes.length > 0 && (
           <>
             <button className="mt-4 text-white underline" onClick={() => setShowSaved((x) => !x)}>
               {showSaved ? "Hide Saved ▲" : "View Saved ▼"}
             </button>
-
             <AnimatePresence>
               {showSaved && (
                 <motion.div className="bg-white/10 rounded-xl p-3 mt-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -545,15 +470,10 @@ const detectMood = async () => {
                       className="bg-white/20 p-2 rounded mb-1 flex justify-between items-center"
                       onClick={() => applyTheme(t)}
                     >
-                      <span>
-                        {moodEmojis[t.mood]} {t.mood.toUpperCase()}
-                      </span>
+                      <span>{moodEmojis[t.mood]} {t.mood.toUpperCase()}</span>
                       <button
                         className="bg-white/40 px-2 py-1 text-xs rounded"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeTheme(i);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); removeTheme(i); }}
                       >
                         ✖
                       </button>
@@ -566,7 +486,7 @@ const detectMood = async () => {
         )}
       </motion.div>
 
-      {/* 🔐 Login and Profile Modals */}
+      {/* Modals */}
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
       {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
     </motion.div>
