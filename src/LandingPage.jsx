@@ -1,14 +1,23 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Home, Info, Mail, Palette, User } from "lucide-react";
+import { useNavigate } from "react-router-dom"; // ✅ Removed useLocation (not used here)
 import LoginModal from "./components/LoginModal";
 import Logo from "./assets/logo.png";
+import { useAuth } from "./contexts/AuthContext"; // ✅ Import Auth to check status
 
 function LandingPage() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const { user } = useAuth(); // ✅ Get current user
   const [showLogin, setShowLogin] = useState(false);
+
+  // ✅ SMART FUNCTION: Check login status first
+  const handleGetStarted = () => {
+    if (user) {
+      navigate("/app"); // If logged in, go straight to App
+    } else {
+      setShowLogin(true); // If guest, open Login Modal
+    }
+  };
 
   return (
     <div
@@ -27,13 +36,13 @@ function LandingPage() {
         className="p-6 max-w-3xl mt-24"
       >
         <h1 className="text-6xl font-extrabold mb-6 drop-shadow-lg text-white flex items-center justify-center gap-1">
-        <img
-          src={Logo}
-          alt="Feelify"
-          className="w-20 h-20 inline-block"
-        />
-        Feelify
-      </h1>
+          <img
+            src={Logo}
+            alt="Feelify"
+            className="w-20 h-20 inline-block"
+          />
+          Feelify
+        </h1>
 
         <p className="text-xl text-white/90 mb-8 leading-relaxed">
           Experience the power of emotion-driven design.  
@@ -41,7 +50,7 @@ function LandingPage() {
         </p>
 
         <motion.button
-          onClick={() => setShowLogin(true)} // 👈 opens firebase login modal
+          onClick={handleGetStarted} // ✅ UPDATED: Uses the smart function
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           className="bg-white/20 px-8 py-3 rounded-full text-white font-semibold shadow-lg hover:bg-white/30 transition-all border border-white/40"
@@ -60,7 +69,7 @@ function LandingPage() {
         © 2025 Feelify | Built with ❤ by BitWizards ✨
       </motion.div>
 
-      {/* ✅ Firebase Login Modal */}
+      {/* ✅ Login Modal */}
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
 
       {/* Animation */}
