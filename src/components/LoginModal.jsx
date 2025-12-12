@@ -1,12 +1,13 @@
 // src/components/LoginModal.jsx
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom"; // ✅ Added for redirection
-import { useAuth } from "../contexts/AuthContext"; // ✅ Added to fix the crash
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import ModalPortal from "./ModalPortal";
 
 const LoginModal = ({ onClose }) => {
-  const { login, signup } = useAuth(); // ✅ Get the real functions
+  // ✅ Get the google login function along with others
+  const { login, signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [isSignup, setIsSignup] = useState(false);
@@ -16,6 +17,7 @@ const LoginModal = ({ onClose }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Handle Email/Password Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -23,22 +25,30 @@ const LoginModal = ({ onClose }) => {
 
     try {
       if (isSignup) {
-        // Create Account + Login
         await signup(email, password, name);
       } else {
-        // Just Login
         await login(email, password);
       }
       
-      // ✅ Success!
-      onClose(); // Close the popup
+      onClose(); // Close modal
       navigate("/app"); // Redirect to Dashboard
     } catch (err) {
       console.error(err);
-      // Appwrite errors are usually descriptive
       setError(err.message || "Failed to authenticate");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle Google Login
+  const handleGoogleLogin = async () => {
+    try {
+      await loginWithGoogle();
+      // Note: No need to navigate() or onClose() here because 
+      // the browser will redirect entirely to Google's page.
+    } catch (err) {
+      console.error(err);
+      setError("Failed to initialize Google Login");
     }
   };
 
@@ -78,7 +88,30 @@ const LoginModal = ({ onClose }) => {
             </div>
           )}
 
-          {/* Form */}
+          {/* 🔵 GOOGLE LOGIN BUTTON */}
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full py-3 rounded-lg bg-white text-black font-bold shadow-lg flex items-center justify-center gap-3 hover:bg-gray-100 transition mb-5"
+          >
+            <img 
+              src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" 
+              alt="Google" 
+              className="w-5 h-5" 
+            />
+            Sign in with Google
+          </button>
+
+          {/* Divider */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/20"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-wider">
+              <span className="px-2 text-white/50 bg-[#1a1a1a] rounded">Or continue with email</span>
+            </div>
+          </div>
+
+          {/* Email Form */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {isSignup && (
               <input
@@ -105,7 +138,7 @@ const LoginModal = ({ onClose }) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8} // Appwrite usually requires 8 chars
+              minLength={8}
             />
 
             <motion.button
@@ -128,7 +161,7 @@ const LoginModal = ({ onClose }) => {
               type="button"
               onClick={() => {
                 setIsSignup(!isSignup);
-                setError(""); // Clear errors when switching
+                setError("");
               }}
               className="text-blue-300 hover:text-blue-200 underline font-semibold transition"
             >
