@@ -2,8 +2,7 @@ import fetch from "node-fetch";
 
 export const handler = async (event) => {
   const { input } = JSON.parse(event.body);
-  const API_KEY = "AIzaSyCODOrRg2QZ28epbX84EBECnUO9Zj26WoM";
-
+const API_KEY = process.env.GEMINI_API_KEY;
   const prompt = `Analyze the emotion in this sentence and return only one mood word: happy, sad, angry, calm, neutral, excited. Sentence: "${input}"`;
 
   try {
