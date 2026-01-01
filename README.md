@@ -35,6 +35,21 @@ By using facial expressions, tone of voice, or user input, Feelify transforms in
 
 ---
 
+### Backend server:
+
+https://feelify-of1k.onrender.com/api/detect-mood
+https://dashboard.render.com/web/srv-d471jichg0os73fdt2dg
+
+### Project Console: 
+
+https://cloud.appwrite.io/console/project-fra-693590ba002be0eb2ab7/overview/platforms
+
+### Hosting URL: 
+
+https://feelify-v1.netlify.app/
+
+
+
 ## 🗺 Roadmap
 
 ### Phase 1 — Setup  
